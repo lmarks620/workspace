@@ -1,0 +1,324 @@
+/**
+ * eScribe ROI Calculator
+ * Calculates time savings, cost savings, and compliance risk reduction
+ */
+
+// Configuration and benchmarks
+const CONFIG = {
+    // Hours with eScribe (based on 80% reduction average)
+    hoursWithEscribe: 5,
+    
+    // Printing cost per page (B&W laser)
+    costPerPage: 0.07,
+    
+    // Organization size defaults
+    orgSizeDefaults: {
+        small: {
+            meetings: 30,
+            staff: 2,
+            hours: 20,
+            rate: 35,
+            pages: 100,
+            copies: 10
+        },
+        medium: {
+            meetings: 48,
+            staff: 3,
+            hours: 25,
+            rate: 40,
+            pages: 150,
+            copies: 15
+        },
+        large: {
+            meetings: 72,
+            staff: 5,
+            hours: 30,
+            rate: 45,
+            pages: 175,
+            copies: 20
+        },
+        major: {
+            meetings: 120,
+            staff: 8,
+            hours: 35,
+            rate: 50,
+            pages: 200,
+            copies: 25
+        }
+    },
+    
+    // Compliance risk benchmarks by organization size
+    complianceRisk: {
+        small: {
+            high: { exposure: 50000, probability: 0.10 },
+            medium: { exposure: 30000, probability: 0.05 },
+            low: { exposure: 15000, probability: 0.02 }
+        },
+        medium: {
+            high: { exposure: 150000, probability: 0.20 },
+            medium: { exposure: 75000, probability: 0.10 },
+            low: { exposure: 35000, probability: 0.05 }
+        },
+        large: {
+            high: { exposure: 250000, probability: 0.30 },
+            medium: { exposure: 125000, probability: 0.15 },
+            low: { exposure: 50000, probability: 0.07 }
+        },
+        major: {
+            high: { exposure: 400000, probability: 0.40 },
+            medium: { exposure: 200000, probability: 0.20 },
+            low: { exposure: 75000, probability: 0.10 }
+        }
+    },
+    
+    // Risk with eScribe (significantly reduced)
+    escribeRiskReduction: 0.80 // 80% risk reduction
+};
+
+// DOM Elements
+const elements = {
+    // Inputs
+    orgSize: document.getElementById('orgSize'),
+    meetingsPerYear: document.getElementById('meetingsPerYear'),
+    staffCount: document.getElementById('staffCount'),
+    hoursPerMeeting: document.getElementById('hoursPerMeeting'),
+    hoursPerMeetingValue: document.getElementById('hoursPerMeetingValue'),
+    hourlyRate: document.getElementById('hourlyRate'),
+    packetPages: document.getElementById('packetPages'),
+    printedCopies: document.getElementById('printedCopies'),
+    
+    // Compliance checkboxes
+    comp1: document.getElementById('comp1'),
+    comp2: document.getElementById('comp2'),
+    comp3: document.getElementById('comp3'),
+    comp4: document.getElementById('comp4'),
+    comp5: document.getElementById('comp5'),
+    
+    // Compliance display
+    complianceScoreBox: document.getElementById('complianceScoreBox'),
+    complianceScore: document.getElementById('complianceScore'),
+    
+    // Results - Summary
+    totalHoursSaved: document.getElementById('totalHoursSaved'),
+    totalSavings: document.getElementById('totalSavings'),
+    complianceRisk: document.getElementById('complianceRisk'),
+    
+    // Results - Breakdown
+    laborSavings: document.getElementById('laborSavings'),
+    hoursSavedDetail: document.getElementById('hoursSavedDetail'),
+    hourlyRateDetail: document.getElementById('hourlyRateDetail'),
+    laborProgress: document.getElementById('laborProgress'),
+    
+    printSavings: document.getElementById('printSavings'),
+    meetingsDetail: document.getElementById('meetingsDetail'),
+    pagesDetail: document.getElementById('pagesDetail'),
+    copiesDetail: document.getElementById('copiesDetail'),
+    printProgress: document.getElementById('printProgress'),
+    
+    complianceSavings: document.getElementById('complianceSavings'),
+    complianceProgress: document.getElementById('complianceProgress'),
+    
+    // Time comparison
+    manualBar: document.getElementById('manualBar'),
+    manualHours: document.getElementById('manualHours'),
+    escribeBar: document.getElementById('escribeBar'),
+    escribeHours: document.getElementById('escribeHours'),
+    timeSavingsPercent: document.getElementById('timeSavingsPercent'),
+    
+    // Risk detail
+    riskDetailBox: document.getElementById('riskDetailBox'),
+    riskMessage: document.getElementById('riskMessage'),
+    lawsuitProbability: document.getElementById('lawsuitProbability'),
+    avgSettlement: document.getElementById('avgSettlement'),
+    
+    // Total
+    totalValue: document.getElementById('totalValue')
+};
+
+// Helper functions
+function formatNumber(num) {
+    return Math.round(num).toLocaleString('en-US');
+}
+
+function getComplianceLevel() {
+    const checks = [
+        elements.comp1.checked,
+        elements.comp2.checked,
+        elements.comp3.checked,
+        elements.comp4.checked,
+        elements.comp5.checked
+    ];
+    const checkedCount = checks.filter(Boolean).length;
+    
+    if (checkedCount <= 1) return 'high';
+    if (checkedCount <= 3) return 'medium';
+    return 'low';
+}
+
+function updateComplianceDisplay(level) {
+    const box = elements.complianceScoreBox;
+    const score = elements.complianceScore;
+    const riskBox = elements.riskDetailBox;
+    
+    // Remove all classes
+    box.classList.remove('low-risk', 'medium-risk', 'high-risk');
+    score.classList.remove('low-risk', 'medium-risk', 'high-risk');
+    riskBox.classList.remove('low-risk');
+    
+    // Add appropriate class
+    box.classList.add(level + '-risk');
+    score.classList.add(level + '-risk');
+    
+    // Update text
+    const labels = {
+        high: 'High Risk',
+        medium: 'Medium Risk',
+        low: 'Low Risk'
+    };
+    score.textContent = labels[level];
+    
+    // Update risk message
+    const messages = {
+        high: 'Based on your answers, your organization has significant compliance gaps that could expose you to lawsuits. Open meetings violations, accessibility issues, and record retention failures are common sources of municipal litigation.',
+        medium: 'Your organization has some compliance measures in place, but gaps remain. Consider automated solutions to reduce your exposure to compliance lawsuits.',
+        low: 'Your organization has good compliance practices in place. Automated meeting management can further strengthen your compliance posture and reduce residual risk.'
+    };
+    elements.riskMessage.textContent = messages[level];
+    
+    if (level === 'low') {
+        riskBox.classList.add('low-risk');
+    }
+}
+
+// Main calculation function
+function calculate() {
+    // Get input values
+    const orgSize = elements.orgSize.value;
+    const meetings = parseInt(elements.meetingsPerYear.value) || 48;
+    const staff = parseInt(elements.staffCount.value) || 3;
+    const hoursManual = parseInt(elements.hoursPerMeeting.value) || 25;
+    const hourlyRate = parseFloat(elements.hourlyRate.value) || 40;
+    const pages = parseInt(elements.packetPages.value) || 150;
+    const copies = parseInt(elements.printedCopies.value) || 15;
+    
+    // Calculate hours with eScribe (minimum 3 hours, max 20% of manual time)
+    const hoursWithEscribe = Math.max(3, Math.min(hoursManual * 0.2, 8));
+    
+    // Calculate time savings
+    const hoursSavedPerMeeting = hoursManual - hoursWithEscribe;
+    const totalHoursSaved = meetings * hoursSavedPerMeeting;
+    const timeSavingsPercent = Math.round((hoursSavedPerMeeting / hoursManual) * 100);
+    
+    // Calculate labor savings
+    const laborSavings = totalHoursSaved * hourlyRate;
+    
+    // Calculate print savings
+    const printSavings = meetings * pages * copies * CONFIG.costPerPage;
+    
+    // Calculate compliance risk
+    const complianceLevel = getComplianceLevel();
+    updateComplianceDisplay(complianceLevel);
+    
+    const riskData = CONFIG.complianceRisk[orgSize][complianceLevel];
+    const currentRiskExposure = riskData.exposure;
+    const currentProbability = riskData.probability;
+    
+    // Annual expected cost without eScribe
+    const annualRiskCostWithout = (currentRiskExposure * currentProbability) / 5; // 5-year probability
+    
+    // With eScribe (80% risk reduction)
+    const reducedExposure = currentRiskExposure * (1 - CONFIG.escribeRiskReduction);
+    const reducedProbability = currentProbability * (1 - CONFIG.escribeRiskReduction);
+    const annualRiskCostWith = (reducedExposure * reducedProbability) / 5;
+    
+    const complianceSavings = annualRiskCostWithout - annualRiskCostWith;
+    
+    // Total savings
+    const totalSavings = laborSavings + printSavings;
+    const totalValue = totalSavings + complianceSavings;
+    
+    // Update display - Summary cards
+    elements.totalHoursSaved.textContent = formatNumber(totalHoursSaved);
+    elements.totalSavings.textContent = formatNumber(totalSavings);
+    elements.complianceRisk.textContent = formatNumber(currentRiskExposure);
+    
+    // Update display - Breakdown
+    elements.laborSavings.textContent = formatNumber(laborSavings);
+    elements.hoursSavedDetail.textContent = formatNumber(totalHoursSaved);
+    elements.hourlyRateDetail.textContent = formatNumber(hourlyRate);
+    
+    elements.printSavings.textContent = formatNumber(printSavings);
+    elements.meetingsDetail.textContent = meetings;
+    elements.pagesDetail.textContent = pages;
+    elements.copiesDetail.textContent = copies;
+    
+    elements.complianceSavings.textContent = formatNumber(complianceSavings);
+    
+    // Update progress bars (relative to total)
+    const maxSaving = Math.max(laborSavings, printSavings, complianceSavings);
+    const totalForProgress = laborSavings + printSavings + complianceSavings;
+    
+    elements.laborProgress.style.width = `${(laborSavings / totalForProgress) * 100}%`;
+    elements.printProgress.style.width = `${(printSavings / totalForProgress) * 100}%`;
+    elements.complianceProgress.style.width = `${(complianceSavings / totalForProgress) * 100}%`;
+    
+    // Update time comparison
+    const maxHours = Math.max(hoursManual, 50);
+    elements.manualBar.style.width = `${(hoursManual / maxHours) * 100}%`;
+    elements.manualHours.textContent = `${hoursManual} hours`;
+    elements.escribeBar.style.width = `${(hoursWithEscribe / maxHours) * 100}%`;
+    elements.escribeHours.textContent = `${Math.round(hoursWithEscribe)} hours`;
+    elements.timeSavingsPercent.textContent = `${timeSavingsPercent}%`;
+    
+    // Update risk detail
+    elements.lawsuitProbability.textContent = `${Math.round(currentProbability * 100)}%`;
+    elements.avgSettlement.textContent = formatNumber(currentRiskExposure);
+    
+    // Update total value
+    elements.totalValue.textContent = formatNumber(totalValue);
+}
+
+// Update defaults when organization size changes
+function updateDefaults() {
+    const size = elements.orgSize.value;
+    const defaults = CONFIG.orgSizeDefaults[size];
+    
+    elements.meetingsPerYear.value = defaults.meetings;
+    elements.staffCount.value = defaults.staff;
+    elements.hoursPerMeeting.value = defaults.hours;
+    elements.hoursPerMeetingValue.textContent = defaults.hours;
+    elements.hourlyRate.value = defaults.rate;
+    elements.packetPages.value = defaults.pages;
+    elements.printedCopies.value = defaults.copies;
+    
+    calculate();
+}
+
+// Event listeners
+elements.orgSize.addEventListener('change', updateDefaults);
+elements.meetingsPerYear.addEventListener('input', calculate);
+elements.staffCount.addEventListener('input', calculate);
+elements.hoursPerMeeting.addEventListener('input', function() {
+    elements.hoursPerMeetingValue.textContent = this.value;
+    calculate();
+});
+elements.hourlyRate.addEventListener('input', calculate);
+elements.packetPages.addEventListener('input', calculate);
+elements.printedCopies.addEventListener('input', calculate);
+
+// Compliance checkboxes
+elements.comp1.addEventListener('change', calculate);
+elements.comp2.addEventListener('change', calculate);
+elements.comp3.addEventListener('change', calculate);
+elements.comp4.addEventListener('change', calculate);
+elements.comp5.addEventListener('change', calculate);
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    calculate();
+});
+
+// Also run calculation immediately in case DOM is already loaded
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    calculate();
+}
