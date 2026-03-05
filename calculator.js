@@ -239,8 +239,8 @@ function calculate() {
     const pages = parseInt(elements.packetPages.value) || 150;
     const copies = parseInt(elements.printedCopies.value) || 15;
     
-    // Calculate hours with eScribe (minimum 3 hours, max 20% of manual time)
-    const hoursWithEscribe = Math.max(3, Math.min(hoursManual * 0.2, 8));
+    // Hours with eScribe: fixed benchmark (~5 hrs with automation so ROI % varies with manual hours)
+    const hoursWithEscribe = CONFIG.hoursWithEscribe;
     
     // Calculate time savings
     const hoursSavedPerMeeting = hoursManual - hoursWithEscribe;
